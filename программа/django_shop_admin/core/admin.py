@@ -33,6 +33,9 @@ class ProductAdmin(NumericFilterModelAdmin):
 	filter_horizontal = ('categories',)
 	actions = ('make_active', 'make_inactive')
 	list_per_page = 50
+	
+	class Media:
+		css = {'all': ('css/productlist.css',)}
 
 
 	def main_image(self, instance):
