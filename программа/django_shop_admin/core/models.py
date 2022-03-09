@@ -61,4 +61,24 @@ class Category(Model):
 				CheckConstraint(check=Q(title__iregex=r'^\S.*\S$'), name='category_title_check'),
 		)
 		
+class CategoryParent(Model):
+	from_category = ForeignKey(Category, on_delete=CASCADE, 
+		verbose_name='Дочерняя категория')
+	to_category = ForeignKey(Category, on_delete=CASCADE, 
+		related_name='from_category', verbose_name='Родительская категория')
+
+	class Meta:
+		constraints = (
+				UniqueConstraint(fields=('from_category', 'to_category'), name='unique_category_parent'),
+				CheckConstraint(check=~Q(from_category=F('to_category')), name='self_parent_category_check')
+			)
+		verbose_name = "Отношение категорий"
+		verbose_name_plural = "Отношения категорий"
+
+	@transaction.atomic
+	def save(self, *args, **kwargs):
+		check_child_in_parents(self.from_category_id, self.to_category_id, self.to_category_id)
+		super(CategoryParent, self).save(*args, **kwargs)
+		
+
 
