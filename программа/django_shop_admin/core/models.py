@@ -81,4 +81,29 @@ class CategoryParent(Model):
 		super(CategoryParent, self).save(*args, **kwargs)
 		
 
+def check_child_in_parents(from_id, to_id, start_to, checked=set()):
+	if CategoryParent.objects.filter(from_category_id=to_id, to_category_id=from_id).exists():
+			raise ValidationError(f'Доч. категория {Category.objects.get(id=from_id).title} не может быть родительской '\
+				f"для {Category.objects.filter(pk=start_to).values_list('title', flat=True)[0]} "\
+				f"({Category.objects.filter(pk=to_id).values_list('title', flat=True)[0]}).")
+	else:
+		for i in CategoryParent.objects.filter(from_category_id=to_id).values_list('to_category_id', flat=True):
+			if i not in checked:
+				checked.add(i)
+				check_child_in_parents(from_id, i, start_to, checked)
+
+
+def process_m2m_category_update(sender, instance, action, reverse, pk_set, **kwargs):
+	if action == 'pre_add':
+		if reverse:
+			for k in pk_set:
+				check_child_in_parents(k, instance.pk, instance.pk)
+		else:
+			for k in pk_set:
+				check_child_in_parents(instance.pk, k, k)
+	
+
+m2m_changed.connect(process_m2m_category_update, sender=CategoryParent)
+
+
 
