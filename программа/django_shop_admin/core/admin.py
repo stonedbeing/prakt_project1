@@ -19,6 +19,11 @@ from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.models import User
 from django.template.defaultfilters import truncatechars
 
+class ManagedShopsInlineAdmin(admin.TabularInline):
+	model = Shop.product_managers.through
+	extra = 0
+	verbose_name_plural = 'Связанные магазины'
+	verbose_name = 'Магазин'
 
 @admin.register(Shop)
 class ShopAdmin(admin.ModelAdmin):
