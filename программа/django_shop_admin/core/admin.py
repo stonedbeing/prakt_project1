@@ -19,10 +19,27 @@ from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.models import User
 from django.template.defaultfilters import truncatechars
 
+
+class ParentCategoryFilter(admin.SimpleListFilter):
+	title = 'Род. категория'
+	parameter_name = 'parents__id'
+
+	def lookups(self, request, model_admin):
+		objs = Category.objects.filter(from_category__isnull=False).only('title').distinct().order_by('title')
+		return [(o.pk, o.title) for o in objs]
+
+	def queryset(self, request, queryset):
+		value = self.value()
+		if value is not None:
+			return queryset.filter(parents__id=self.value())
+		return queryset
+
+
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin)
 	list_display = ('title','id', 'description')
 	search_fields = ('products__id', 'title')
+	list_filter = (ParentCategoryFilter,)
 	ordering = ('title',)
 	readonly_fields = ('id',)
 
