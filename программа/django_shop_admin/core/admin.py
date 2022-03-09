@@ -35,9 +35,18 @@ class CustomUserAdmin(UserAdmin):
 admin.site.unregister(User)
 admin.site.register(User, CustomUserAdmin)
 
+class ShortDescriptionListFieldMixin:
+	short_description_length = 160
+
+	def short_description(self, instance):
+		return truncatechars(instance.description, self.short_description_length)
+
+	short_description.short_description = 'Описание'
+
+
 @admin.register(Shop)
-class ShopAdmin(admin.ModelAdmin):
-	list_display = ('title','image','id')
+class ShopAdmin(admin.ModelAdmin, ShortDescriptionListFieldMixin):
+	list_display = ('title','image','id', 'short_description')
 	search_fields = ('title',)
 	ordering = ('title',)
 	readonly_fields = ('id',)
