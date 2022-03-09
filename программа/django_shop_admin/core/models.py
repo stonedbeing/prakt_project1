@@ -106,4 +106,17 @@ def process_m2m_category_update(sender, instance, action, reverse, pk_set, **kwa
 m2m_changed.connect(process_m2m_category_update, sender=CategoryParent)
 
 
+def product_image_path_handler(instance, filename):
+	return f"{settings.IMAGES_DIR}/products/{instance.product.id}/{uuid.uuid4()}.{filename.split('.')[-1]}"
+
+class ProductImage(Model):
+	image = ImageField(verbose_name='Фото', unique=True, upload_to=product_image_path_handler)
+	product = ForeignKey(Product, on_delete=CASCADE, verbose_name='Продукт', related_name='images')
+
+	class Meta:
+		db_table = 'productimages'
+		verbose_name = 'Фото продукта'
+		verbose_name_plural = 'Фото продукта'
+		
+
 
