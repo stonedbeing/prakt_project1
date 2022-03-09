@@ -66,3 +66,11 @@ class ProductAdmin(NumericFilterModelAdmin):
 			return qs
 		else:
 			return qs.filter(shop__id__in=request.user.managed_shops.values_list('id', flat=True))
+			
+	@admin.action(description='Сделать активными')
+	def make_active(self, request, queryset):
+		queryset.update(active=True)
+
+	@admin.action(description='Сделать неактивными')
+	def make_inactive(self, request, queryset):
+		queryset.update(active=False)
