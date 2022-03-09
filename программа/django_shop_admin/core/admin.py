@@ -19,6 +19,22 @@ from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.models import User
 from django.template.defaultfilters import truncatechars
 
+class ShopFilter(admin.SimpleListFilter):
+	title = 'Магазин'
+	parameter_name = 'shop__id'
+
+	def lookups(self, request, model_admin):
+		objs = Shop.objects if request.user.is_superuser else request.user.managed_shops
+		objs = objs.filter(products__isnull=False).only('title').distinct().order_by('title')
+		return [(o.pk, o.title) for o in objs]
+
+	def queryset(self, request, queryset):
+		value = self.value()
+		if value is not None:
+			return queryset.filter(shop__id=self.value())
+		return queryset
+
+
 class CategoryFilter(admin.SimpleListFilter):
 	title = 'Категория'
 	parameter_name = 'categories__id'
@@ -45,7 +61,7 @@ class ProductAdmin(NumericFilterModelAdmin):
 		('ОСНОВНОЕ ФОТО', {'fields': ('main_image',)}),
 		)
 	search_fields = ('id', 'title')
-	list_filter = ('active',CategoryFilter)
+	list_filter = ('active',CategoryFilter,ShopFilter)
 	readonly_fields = ('id',)
 	filter_horizontal = ('categories',)
 	actions = ('make_active', 'make_inactive')
