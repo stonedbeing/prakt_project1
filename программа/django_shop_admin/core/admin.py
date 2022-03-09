@@ -35,6 +35,63 @@ class ParentCategoryFilter(admin.SimpleListFilter):
 		return queryset
 
 
+class CategoryAdminForm(forms.ModelForm):
+	parents = forms.ModelMultipleChoiceField(label='Родительские категории',
+				queryset = Category.objects.only('title').order_by('title'),
+				required=False,
+				widget=FilteredSelectMultiple(
+						verbose_name='Родительские категории',
+						is_stacked=False
+					))
+
+	children = forms.ModelMultipleChoiceField(label='Дочерние категории',
+				queryset=Category.objects.only('title').order_by('title'),
+				required=False,
+				widget=FilteredSelectMultipleWithReadonlyMode(
+						verbose_name='Дочерние категории',
+						is_stacked=False
+					)
+				)
+
+	class Meta:
+		model = Category
+		fields = '__all__'
+
+	def __init__(self, *args, **kwargs):
+		super(CategoryAdminForm, self).__init__(*args, **kwargs)
+		instance = kwargs.get("instance")
+		if instance and instance.pk:
+			self.fields['parents'].queryset=Category.objects.filter(
+						~(Q(pk=instance.pk)|Q(pk__in=instance.category_set.values('id')))
+						).only('title').order_by('title')
+			self.fields['parents'].initial=instance.parents.all()
+			self.fields['children'].queryset=Category.objects.filter(
+							~(Q(pk=instance.pk)|Q(pk__in=instance.parents.values('id')))
+					).only('title').order_by('title')
+			self.fields['children'].initial=instance.category_set.all()
+			self.fields['children'].widget.attrs['readonly']=True
+
+	def save(self, commit=True):
+		category = super(CategoryAdminForm, self).save(commit=False)
+		if commit:
+			error=1
+			try:
+				with transaction.atomic():
+					category.save()
+					data = self.cleaned_data['parents']
+					if self.fields['parents'].has_changed(self.fields['parents'].initial, data):
+						category.parents.set(data)
+					error=2
+					data = self.cleaned_data['children']
+					if self.fields['children'].has_changed(self.fields['children'].initial, data):
+						category.category_set.set(data)
+			except forms.ValidationError as e:
+				self.add_error('parents' if error==1 else 'children', e)
+			except Exception as e:
+				self.add_error(None, e)
+		return category
+
+
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin)
 	list_display = ('title','id', 'description')
@@ -42,6 +99,7 @@ class CategoryAdmin(admin.ModelAdmin)
 	list_filter = (ParentCategoryFilter,)
 	ordering = ('title',)
 	readonly_fields = ('id',)
+	form = CategoryAdminForm
 
 	def get_fields(self, request, obj=None):
 		return ('id', 'title', 'description', 'parents', 'children')
