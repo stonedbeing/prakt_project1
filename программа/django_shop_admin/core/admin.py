@@ -94,7 +94,7 @@ class CategoryAdminForm(forms.ModelForm):
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin)
-	list_display = ('title','id', 'description')
+	list_display = ('title','id', 'description', 'category_actions')
 	search_fields = ('products__id', 'title')
 	list_filter = (ParentCategoryFilter,)
 	ordering = ('title',)
@@ -103,3 +103,36 @@ class CategoryAdmin(admin.ModelAdmin)
 
 	def get_fields(self, request, obj=None):
 		return ('id', 'title', 'description', 'parents', 'children')
+		
+	def get_urls(self):
+		urls = super().get_urls()
+		custom_urls = [
+			path(
+				'<int:category_id>/paths/',
+				self.admin_site.admin_view(self.process_paths),
+				name='category-paths',
+			),
+		]
+		return custom_urls + urls    
+
+	def category_actions(self, obj):
+		return format_html(
+			'<a class="button" href="{}">Показать пути</a>',
+			reverse('admin:category-paths', args=[obj.pk])
+		)
+
+	category_actions.short_description = 'Действия'
+	category_actions.allow_tags = True
+
+	def process_paths(self, request, category_id, *args, **kwargs):
+		obj = self.get_object(request, category_id)
+		context = self.admin_site.each_context(request)
+		context['opts'] = self.model._meta
+		paths = list(obj.get_all_paths())
+		context['paths'] = paths
+		context['title'] = f'Пути к категории {obj.title} ({len(paths)})'        
+		return TemplateResponse(
+			request,
+			'admin/category_paths.html',
+			context,
+		)
