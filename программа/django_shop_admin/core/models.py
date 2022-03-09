@@ -32,3 +32,33 @@ class Shop(Model):
 		constraints = (
 				CheckConstraint(check=Q(title__iregex=r'^\S.*\S$'), name='shop_title_check'),
 		)
+		
+class Category(Model):
+	title = CharField(verbose_name='Название', max_length=50, unique=True)
+	description = TextField(verbose_name='Описание', null=True, blank=True)
+	parents = ManyToManyField('self', symmetrical=False, through='CategoryParent', 
+		blank=True, verbose_name='Родительские категории')
+
+	def __str__(self):
+		return self.title
+
+	def get_all_paths(self):
+		if self.parents:
+			for paths, title in ((list(x.get_all_paths()), x.title) for x in self.parents.only('title').order_by('title').iterator()):
+				if not paths:
+					yield title+' / '
+				else:
+					for p in paths:
+						yield p+title+' / '
+		else:
+			yield []
+
+	class Meta:
+		db_table = 'categories'
+		verbose_name = "Категория"
+		verbose_name_plural = "Категории"
+		constraints = (
+				CheckConstraint(check=Q(title__iregex=r'^\S.*\S$'), name='category_title_check'),
+		)
+		
+
