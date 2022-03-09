@@ -73,3 +73,17 @@ class ShopAdmin(admin.ModelAdmin, ShortDescriptionListFieldMixin):
 			return super().get_queryset(request)
 		else:
 			return request.user.managed_shops.order_by(*self.ordering)
+			
+	def can_access_object(self, request, obj):
+		if obj is None:
+			return True
+		return request.user.managed_shops.filter(id=obj.id).exists()
+
+	def has_view_permission(self, request, obj=None):
+		if request.user.is_superuser:
+			return True
+		else:
+			if super().has_view_permission(request, obj):
+				return self.can_access_object(request, obj)
+			else:
+				return False
