@@ -24,6 +24,16 @@ class ManagedShopsInlineAdmin(admin.TabularInline):
 	extra = 0
 	verbose_name_plural = 'Связанные магазины'
 	verbose_name = 'Магазин'
+	
+class CustomUserAdmin(UserAdmin):
+	def get_inlines(self, request, obj):
+		if obj and (obj.managed_shops or obj.groups.filter(name='product managers').exists()):
+			return (ManagedShopsInlineAdmin,)
+		else:
+			return ()
+
+admin.site.unregister(User)
+admin.site.register(User, CustomUserAdmin)
 
 @admin.register(Shop)
 class ShopAdmin(admin.ModelAdmin):
