@@ -204,3 +204,96 @@ class CategoryAdmin(admin.ModelAdmin)
 			'admin/category_paths.html',
 			context,
 		)
+		
+
+class ShopFilter(admin.SimpleListFilter):
+	title = 'Магазин'
+	parameter_name = 'shop__id'
+
+	def lookups(self, request, model_admin):
+		objs = Shop.objects if request.user.is_superuser else request.user.managed_shops
+		objs = objs.filter(products__isnull=False).only('title').distinct().order_by('title')
+		return [(o.pk, o.title) for o in objs]
+
+	def queryset(self, request, queryset):
+		value = self.value()
+		if value is not None:
+			return queryset.filter(shop__id=self.value())
+		return queryset
+
+
+class CategoryFilter(admin.SimpleListFilter):
+	title = 'Категория'
+	parameter_name = 'categories__id'
+
+	def lookups(self, request, model_admin):
+		filters = {'products__isnull': False}
+		if not request.user.is_superuser:
+			filters['products__shop__id__in']=request.user.managed_shops.values_list('id', flat=True)
+		objs = Category.objects.filter(**filters).only('title').distinct().order_by('title')
+		return [(o.pk, o.title) for o in objs]
+
+	def queryset(self, request, queryset):
+		value = self.value()
+		if value is not None:
+			return queryset.filter(categories__id=self.value())
+		return queryset
+
+
+@admin.register(Product)
+class ProductAdmin(NumericFilterModelAdmin):
+	list_display = ('title','main_image', 'id', 'amount', 'price', 'active', 'shop_id')
+	fieldsets = ((None, {'fields':('id', 'shop', 'title', 'description', 'active', 'amount', 'price')}),
+		('КАТЕГОРИИ', {'fields': ('categories',), 'classes': ('collapse',)}),
+		('ОСНОВНОЕ ФОТО', {'fields': ('main_image',)}),
+		)
+	search_fields = ('id', 'title')
+	list_filter = ('active',CategoryFilter,ShopFilter)
+	readonly_fields = ('id',)
+	filter_horizontal = ('categories',)
+	actions = ('make_active', 'make_inactive')
+	list_per_page = 50
+	
+	class Media:
+		css = {'all': ('css/productlist.css',)}
+
+
+	def main_image(self, instance):
+		url = instance.images.only('image').first()
+		if url:
+			return format_html("<img src='{}{}' width=100 height=100 style='object-fit:contain' />",
+				settings.MEDIA_URL, url.image)
+		else:
+			return format_html("<img alt='—' />")
+
+	main_image.short_description = 'Фото'
+
+	def formfield_for_manytomany(self, db_field, request, **kwargs):
+		if db_field.name == "categories":
+			kwargs["queryset"] = Category.objects.only('title').order_by('title')
+		return super().formfield_for_manytomany(db_field, request, **kwargs)
+
+	def formfield_for_foreignkey(self, db_field, request, **kwargs):
+		if db_field.name == 'shop':
+			qs = None
+			if not request.user.is_superuser:
+				qs = request.user.managed_shops
+			else:
+				qs = Shop.objects
+			kwargs['queryset']=qs.only('title').order_by('title')
+		return super().formfield_for_foreignkey(db_field, request, **kwargs)
+		
+	def get_queryset(self, request):
+		qs = super().get_queryset(request)
+		if request.user.is_superuser:
+			return qs
+		else:
+			return qs.filter(shop__id__in=request.user.managed_shops.values_list('id', flat=True))
+			
+	@admin.action(description='Сделать активными')
+	def make_active(self, request, queryset):
+		queryset.update(active=True)
+
+	@admin.action(description='Сделать неактивными')
+	def make_inactive(self, request, queryset):
+		queryset.update(active=False)
