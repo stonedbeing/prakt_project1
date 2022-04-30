@@ -1,0 +1,130 @@
+<?xml version="1.0"?>
+<!DOCTYPE article PUBLIC "-//OASIS//DTD Simplified DocBook XML V1.0//EN"
+"http://www.oasis-open.org/docbook/xml/simple/1.0/sdocbook.dtd">
+<article xmlns='http://docbook.org/ns/docbook'>
+  <section>
+    <title>Описание</title>
+    <para>Проект представляет собой панель администратора для интернет-магазинов на языке Python c фреймворком Django c целью ускорения старта их деятельности</para>
+    <section>
+    <title>
+    Администратор магазинов
+    </title>
+    <itemizedlist>
+    <listitem>
+    <para>Перемещение по списку магазинов.</para>
+    </listitem>
+    <listitem><para>Поиск по названию.</para></listitem>
+    <listitem><para>Редактирования всех данных, кроме идентификатора магазин.</para></listitem>
+    <itemizedlist>
+    </section>
+    <section>
+    <title>
+    Администратор категорий
+    </title>
+    <itemizedlist>
+    <listitem><para>Перемещение по списку категорий.</para></listitem>
+    <listitem><para>Поиск по идентификатору продукта, названию и родительской категории.</para></listitem>
+    <listitem><para>Добавление одной или нескольких родительских категорий.</para></listitem>
+    <listitem><para>Просмотр всех возможных путей к выбранной категории.</para></listitem>
+    </itemizedlist>
+    </section>
+     <section>
+    <title>
+    Администратор продуктов
+    </title>
+    <itemizedlist>
+    <listitem><para>Перемещение по списку продуктов.</para></listitem>
+    <listitem><para>Поиск по идентификатору или названию продукта.</para></listitem>
+    <listitem><para>Редактирование всех данных, кроме идентификатора.</para></listitem>
+    <listitem><para>Добавление основного и дополнительных изображений.</para></listitem>
+    <listitem><para>Сортировка товаров в списке товаров по количеству заказов и по цене.</para></listitem>
+    <listitem><para>Фильтр товаров по активному флагу.</para></listitem>
+    <listitem><para>Фильтр по ценовому диапазону.</para></listitem>
+    <listitem><para>Прикрепление товара к одной или нескольким категориям.</para></listitem>
+    </itemizedlist>
+    </section>
+  </section>
+  <section>
+    <title>Примеры кода</title>
+    <example>
+    <para>Пример 1 - Генерация пути к файлу</para>
+    <programlisting>
+    def shop_image_path_handler(instance, filename):
+	"""Генерирует и возвращет путь к файлу изображения магазина.
+	  Args:
+	    instance: объект модели изоражения
+	    filename: имя файла
+	  Returns:
+	  	str: путь к файлу на сервере
+	"""
+	return f"{settings.IMAGES_DIR}/shops/{uuid.uuid4()}.{filename.split('.')[-1]}"
+    </programlisting>
+    </example>
+    
+    <example>
+    <para>Пример 2 - Класс модели магазина</para>
+    <programlisting>
+    class Shop(Model):
+	"""Класс модели магазина
+	  
+	  Attributes:
+	    title: название
+	    description: описание
+	    imageUrl: путь к изображению
+	    product_managers: менеджеры
+	"""
+	title = CharField(verbose_name='Название', max_length=50, unique=True)
+	description = TextField(verbose_name='Описание', null=True, blank=True)
+	imageUrl = ImageField(verbose_name="Фото", null=True, blank=True, 
+		upload_to=shop_image_path_handler, unique=True)
+	product_managers = ManyToManyField(User, limit_choices_to=Q(groups__name='product managers'),
+		related_name='managed_shops', verbose_name='Менеджеры продуктов', blank=True)
+
+	def __str__(self):
+		return self.title
+
+	class Meta:
+		"""Локальный класс настроек модели
+
+		  Attributes:
+		    db_table: название таблицы модели в БД
+		    verbose_name: наименование одного объекта модели
+		    verbose_name_plural: множественное число наименования модели
+		    constraints: ограничения таблицы БД
+		"""
+		db_table = 'shops'
+		verbose_name = "Магазин"
+		verbose_name_plural = "Магазины"
+		constraints = (
+				CheckConstraint(check=Q(title__iregex=r'^\S.*\S$'), name='shop_title_check'),
+		)
+    </programlisting>
+    </example>
+    
+    <example>
+    <para>Пример 3 - Проверка наличия дочерней категории среди родительских</para>
+    <programlisting>
+    def check_child_in_parents(from_id, to_id, start_to, checked=set()):
+	"""Проверяет, не является выбранная дочерняя категория родительской по отношению к самой себе 
+
+	  Args:
+	    from_id: ID дочерней категории
+	    to_id: ID родительской категории
+	    start_to: ID родительской категории, с которой начинается проверка
+	    checked: проверенные категории
+	  Returns:	  
+	"""
+	if CategoryParent.objects.filter(from_category_id=to_id, to_category_id=from_id).exists():
+			raise ValidationError(f'Доч. категория {Category.objects.get(id=from_id).title} не может быть родительской '\
+				f"для {Category.objects.filter(pk=start_to).values_list('title', flat=True)[0]} "\
+				f"({Category.objects.filter(pk=to_id).values_list('title', flat=True)[0]}).")
+	else:
+		for i in CategoryParent.objects.filter(from_category_id=to_id).values_list('to_category_id', flat=True):
+			if i not in checked:
+				checked.add(i)
+				check_child_in_parents(from_id, i, start_to, checked)
+    </programlisting>
+    </example>
+  </section>
+</article>
+
