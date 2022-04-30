@@ -1,0 +1,95 @@
+<h1>Описание</h1>
+<p>Проект представляет собой панель администратора для интернет-магазинов на языке Python c фреймворком Django c целью ускорения старта их деятельности</p>
+<h2>Администратор магазинов</h2>
+<ul>
+<li><p>Перемещение по списку магазинов.</p></li>
+<li><p>Поиск по названию.</p></li>
+<li><p>Редактирования всех данных, кроме идентификатора магазин.</p></li>
+</ul>
+<h2>Администратор категорий</h2>
+<ul>
+<li><p>Перемещение по списку категорий.</p></li>
+<li><p>Поиск по идентификатору продукта, названию и родительской категории.</p></li>
+<li><p>Добавление одной или нескольких родительских категорий.</p></li>
+<li><p>Просмотр всех возможных путей к выбранной категории.</p></li>
+</ul>
+<h2>Администратор продуктов</h2>
+<ul>
+<li><p>Перемещение по списку продуктов.</p></li>
+<li><p>Поиск по идентификатору или названию продукта.</p></li>
+<li><p>Редактирование всех данных, кроме идентификатора.</p></li>
+<li><p>Добавление основного и дополнительных изображений.</p></li>
+<li><p>Сортировка товаров в списке товаров по количеству заказов и по цене.</p></li>
+<li><p>Фильтр товаров по активному флагу.</p></li>
+<li><p>Фильтр по ценовому диапазону.</p></li>
+<li><p>Прикрепление товара к одной или нескольким категориям.</p></li>
+</ul>
+<h1>Примеры кода</h1>
+<p>Пример 1 - Генерация пути к файлу</p>
+<pre><code>    def shop_image_path_handler(instance, filename):
+    &quot;&quot;&quot;Генерирует и возвращет путь к файлу изображения магазина.
+      Args:
+        instance: объект модели изоражения
+        filename: имя файла
+      Returns:
+        str: путь к файлу на сервере
+    &quot;&quot;&quot;
+    return f&quot;{settings.IMAGES_DIR}/shops/{uuid.uuid4()}.{filename.split(&#39;.&#39;)[-1]}&quot;
+    </code></pre>
+<p>Пример 2 - Класс модели магазина</p>
+<pre><code>    class Shop(Model):
+    &quot;&quot;&quot;Класс модели магазина
+      
+      Attributes:
+        title: название
+        description: описание
+        imageUrl: путь к изображению
+        product_managers: менеджеры
+    &quot;&quot;&quot;
+    title = CharField(verbose_name=&#39;Название&#39;, max_length=50, unique=True)
+    description = TextField(verbose_name=&#39;Описание&#39;, null=True, blank=True)
+    imageUrl = ImageField(verbose_name=&quot;Фото&quot;, null=True, blank=True, 
+        upload_to=shop_image_path_handler, unique=True)
+    product_managers = ManyToManyField(User, limit_choices_to=Q(groups__name=&#39;product managers&#39;),
+        related_name=&#39;managed_shops&#39;, verbose_name=&#39;Менеджеры продуктов&#39;, blank=True)
+
+    def __str__(self):
+        return self.title
+
+    class Meta:
+        &quot;&quot;&quot;Локальный класс настроек модели
+
+          Attributes:
+            db_table: название таблицы модели в БД
+            verbose_name: наименование одного объекта модели
+            verbose_name_plural: множественное число наименования модели
+            constraints: ограничения таблицы БД
+        &quot;&quot;&quot;
+        db_table = &#39;shops&#39;
+        verbose_name = &quot;Магазин&quot;
+        verbose_name_plural = &quot;Магазины&quot;
+        constraints = (
+                CheckConstraint(check=Q(title__iregex=r&#39;^\S.*\S$&#39;), name=&#39;shop_title_check&#39;),
+        )
+    </code></pre>
+<p>Пример 3 - Проверка наличия дочерней категории среди родительских</p>
+<pre><code>    def check_child_in_parents(from_id, to_id, start_to, checked=set()):
+    &quot;&quot;&quot;Проверяет, не является выбранная дочерняя категория родительской по отношению к самой себе 
+
+      Args:
+        from_id: ID дочерней категории
+        to_id: ID родительской категории
+        start_to: ID родительской категории, с которой начинается проверка
+        checked: проверенные категории
+      Returns:    
+    &quot;&quot;&quot;
+    if CategoryParent.objects.filter(from_category_id=to_id, to_category_id=from_id).exists():
+            raise ValidationError(f&#39;Доч. категория {Category.objects.get(id=from_id).title} не может быть родительской &#39;\
+                f&quot;для {Category.objects.filter(pk=start_to).values_list(&#39;title&#39;, flat=True)[0]} &quot;\
+                f&quot;({Category.objects.filter(pk=to_id).values_list(&#39;title&#39;, flat=True)[0]}).&quot;)
+    else:
+        for i in CategoryParent.objects.filter(from_category_id=to_id).values_list(&#39;to_category_id&#39;, flat=True):
+            if i not in checked:
+                checked.add(i)
+                check_child_in_parents(from_id, i, start_to, checked)
+    </code></pre>
